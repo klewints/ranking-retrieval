@@ -1,0 +1,17 @@
+# Virtual environments
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Model files (we'll generate these later)
+*.pth
+*.bin
+
+# Large datasets (don't push these)
+data/raw/
+data/processed/
