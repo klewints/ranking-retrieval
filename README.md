@@ -40,47 +40,58 @@ Below is a high-level architecture diagram showing the implemented components.
 
 ```mermaid
 flowchart LR
-  subgraph Data
-    RAW_SPOTIFY[data/raw/spotify_tracks CSVs]
-    RAW_LASTFM[data/raw/last_fm CSVs]
-    PROCESS[scripts/process_data.py]
-    PROCESSED[data/processed: tracks_cleaned.csv, user_interactions.csv]
-  end
 
-  subgraph Backend[Backend (FastAPI)]
-    SearchSvc[SearchService]
-    RetrievalSvc[RetrievalService]
-    RecommendSvc[RecommendationService]
-    API[FastAPI routers]
-  end
+subgraph Data
+    RAW_SPOTIFY["Spotify Dataset"]
+    RAW_LASTFM["Last.fm Dataset"]
+    PROCESS["Data Preprocessing"]
+    PROCESSED["Processed Data"]
+end
 
-  subgraph SearchLayer[Search Layer]
-    SearchIndex[SearchIndex]
-    Fuzzy[SearchMatcher (RapidFuzz)]
-  end
+subgraph Backend
+    SearchSvc["Search Service"]
+    RetrievalSvc["Retrieval Service"]
+    RecommendSvc["Recommendation Service"]
+    API["FastAPI Routers"]
+end
 
-  subgraph RetrievalLayer[Retrieval Layer]
-    TwoTower[TwoTowerEmbeddings (torch)]
-    LightGCN[LightGCNEmbeddings (torch)]
-    FAISS[FaissIndex (optional faiss lib)]
-    CandidateGen[DefaultCandidateGenerator]
-    Ranking[RankingModelWrapper (optional)]
-  end
+subgraph Search
+    SearchIndex["Search Index"]
+    Fuzzy["RapidFuzz Matcher"]
+end
 
-  RAW_SPOTIFY --> PROCESS --> PROCESSED
-  RAW_LASTFM --> PROCESS --> PROCESSED
-  PROCESSED --> SearchSvc
-  SearchSvc --> SearchLayer
-  SearchSvc --> RetrievalSvc
-  RetrievalSvc --> RetrievalLayer
-  RetrievalSvc --> CandidateGen
-  CandidateGen --> FAISS
-  RetrievalSvc --> RecommendSvc
-  RecommendSvc --> API
-  SearchSvc --> API
+subgraph Retrieval
+    TwoTower["Two-Tower Model"]
+    LightGCN["LightGCN Model"]
+    FAISS["FAISS Index"]
+    CandidateGen["Candidate Generator"]
+    Ranking["Ranking Model"]
+end
 
-  classDef optional fill:#f9f,stroke:#333,stroke-dasharray: 5 5
-  class FAISS,TwoTower,LightGCN,Ranking optional
+RAW_SPOTIFY --> PROCESS
+RAW_LASTFM --> PROCESS
+PROCESS --> PROCESSED
+
+PROCESSED --> SearchSvc
+
+SearchSvc --> SearchIndex
+SearchSvc --> Fuzzy
+
+SearchSvc --> RetrievalSvc
+
+RetrievalSvc --> TwoTower
+RetrievalSvc --> LightGCN
+RetrievalSvc --> FAISS
+RetrievalSvc --> CandidateGen
+CandidateGen --> Ranking
+
+Ranking --> RecommendSvc
+
+RecommendSvc --> API
+SearchSvc --> API
+
+classDef optional fill:#f5f5f5,stroke:#666,stroke-dasharray: 5 5
+class TwoTower,LightGCN,FAISS,Ranking optional
 ```
 
 Explanation of subsystems
