@@ -3,11 +3,11 @@ from typing import List
 
 
 class SearchResult(BaseModel):
-    name: str = Field(..., example="Blank Space")
+    name: str = Field(..., json_schema_extra={"example": "Blank Space"})
+    category: str = Field(..., json_schema_extra={"example": "track"})
     score: float = Field(..., ge=0.0, le=100.0)
 
 
 class SearchResponse(BaseModel):
-    tracks: List[SearchResult] = Field(default_factory=list)
-    artists: List[SearchResult] = Field(default_factory=list)
-    albums: List[SearchResult] = Field(default_factory=list)
+    corrected_query: str = Field(..., json_schema_extra={"example": "Taylor Swift"})
+    results: List[SearchResult] = Field(default_factory=list)
