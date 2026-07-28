@@ -57,38 +57,40 @@ def read_csvs_from_dir(directory: str) -> List[pd.DataFrame]:
     return dfs
 
 
+def _find_column(df: pd.DataFrame, candidate_names: list[str]) -> str | None:
+    lower_columns = {col.lower(): col for col in df.columns}
+    for candidate in candidate_names:
+        if candidate in lower_columns:
+            return lower_columns[candidate]
+    return None
+
+
 def clean_tracks_dataframe(df: pd.DataFrame, source: str) -> pd.DataFrame:
     # Standard columns if present: track_name/title/name, artist_name/artist, album
     df = df.copy()
     rename_map = {}
     # heuristics for title
-    for col in ['track_name', 'title', 'name', 'song']:
-        if col in df.columns:
-            rename_map[col] = 'track'
-            break
-    for col in ['artist_name', 'artist', 'artists']:
-        if col in df.columns:
-            rename_map[col] = 'artist'
-            break
-    for col in ['album_name', 'album']:
-        if col in df.columns:
-            rename_map[col] = 'album'
-            break
+    title_col = _find_column(df, ['track_name', 'title', 'name', 'song'])
+    if title_col:
+        rename_map[title_col] = 'track'
+    artist_col = _find_column(df, ['artist_name', 'artist', 'artists'])
+    if artist_col:
+        rename_map[artist_col] = 'artist'
+    album_col = _find_column(df, ['album_name', 'album'])
+    if album_col:
+        rename_map[album_col] = 'album'
     # popularity
-    for col in ['popularity', 'track_popularity']:
-        if col in df.columns:
-            rename_map[col] = 'popularity'
-            break
+    popularity_col = _find_column(df, ['popularity', 'track_popularity'])
+    if popularity_col:
+        rename_map[popularity_col] = 'popularity'
     # duration
-    for col in ['duration_ms', 'duration']:
-        if col in df.columns:
-            rename_map[col] = 'duration_ms'
-            break
+    duration_col = _find_column(df, ['duration_ms', 'duration'])
+    if duration_col:
+        rename_map[duration_col] = 'duration_ms'
     # genres - may be absent
-    for col in ['genres', 'genre', 'track_genres']:
-        if col in df.columns:
-            rename_map[col] = 'genres'
-            break
+    genres_col = _find_column(df, ['genres', 'genre', 'track_genres'])
+    if genres_col:
+        rename_map[genres_col] = 'genres'
 
     df = df.rename(columns=rename_map)
 
@@ -211,25 +213,31 @@ def create_user_interactions(lastfm_dfs: List[pd.DataFrame], merged: pd.DataFram
     # Expect lastfm_dfs contain user and track/artist info
     records = []
     for df in lastfm_dfs:
-        # Try common columns
-        if 'user' in df.columns or 'user_id' in df.columns or 'username' in df.columns:
-            user_col = next((c for c in ['user', 'user_id', 'username'] if c in df.columns), None)
+        df = df.copy()
+        lower_map = {col.lower(): col for col in df.columns}
+        if 'user' in lower_map:
+            user_col = lower_map['user']
+        elif 'user_id' in lower_map:
+            user_col = lower_map['user_id']
+        elif 'username' in lower_map:
+            user_col = lower_map['username']
         else:
             user_col = None
-        if 'artist' not in df.columns and 'artist_name' in df.columns:
-            df = df.rename(columns={'artist_name': 'artist'})
-        if 'track' not in df.columns and 'track_name' in df.columns:
-            df = df.rename(columns={'track_name': 'track'})
-        if user_col is None or 'artist' not in df.columns or 'track' not in df.columns:
+
+        artist_col = _find_column(df, ['artist', 'artist_name', 'artists'])
+        track_col = _find_column(df, ['track', 'track_name', 'name', 'song'])
+
+        if user_col is None or artist_col is None or track_col is None:
             continue
-        # normalize
-        df_local = df[[user_col, 'artist', 'track']].copy()
+
+        df_local = df[[user_col, artist_col, track_col]].copy()
         df_local.columns = ['user', 'artist', 'track']
         df_local['artist_clean'] = df_local['artist'].apply(normalize_text)
         df_local['track_clean'] = df_local['track'].apply(normalize_text)
         # playcount if present
-        if 'playcount' in df.columns:
-            df_local['playcount'] = pd.to_numeric(df['playcount'], errors='coerce').fillna(1).astype(int)
+        if 'playcount' in lower_map:
+            count_col = lower_map['playcount']
+            df_local['playcount'] = pd.to_numeric(df[count_col], errors='coerce').fillna(1).astype(int)
         else:
             df_local['playcount'] = 1
         records.append(df_local)
