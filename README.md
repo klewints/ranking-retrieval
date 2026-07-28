@@ -94,6 +94,39 @@ classDef optional fill:#f5f5f5,stroke:#666,stroke-dasharray: 5 5
 class TwoTower,LightGCN,FAISS,Ranking optional
 ```
 
+Simplified Architecture Diagram
+```mermaid
+flowchart LR
+
+User --> Frontend
+Frontend --> Backend
+
+Backend --> Search
+Backend --> Retrieval
+Retrieval --> Ranking
+Ranking --> Recommendations
+```
+
+Search Pipeline
+```mermaid
+flowchart LR
+
+Query --> RapidFuzz
+RapidFuzz --> SearchIndex
+SearchIndex --> Results
+Results --> Retrieval
+```
+
+Recommendation Pipeline
+```mermaid
+flowchart LR
+
+SearchResults --> CandidateGeneration
+CandidateGeneration --> FAISS
+FAISS --> Ranking
+Ranking --> Top20
+```
+
 Explanation of subsystems
 
 - Backend: FastAPI application located at backend/api/main.py. The application constructs SearchService and RetrievalService at startup and attempts to load optional retrieval artifacts (Two-Tower, LightGCN, Ranking, FAISS).
