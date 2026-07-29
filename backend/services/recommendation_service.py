@@ -10,8 +10,7 @@ import pandas as pd
 from backend.config import Config
 from backend.retrieval.retrieval_service import RetrievalService
 from backend.retrieval.ranking_model import RankingModelWrapper
-from backend.retrieval.two_tower import TwoTowerEmbeddings
-from backend.retrieval.lightgcn import LightGCNEmbeddings
+from backend.retrieval.embedding_store import EmbeddingStore
 
 logger = logging.getLogger(__name__)
 
@@ -22,19 +21,20 @@ class RecommendationService:
         search_service: Any,
         retrieval_service: RetrievalService,
         ranking_model: Optional[RankingModelWrapper] = None,
-        two_tower: Optional[TwoTowerEmbeddings] = None,
-        lightgcn: Optional[LightGCNEmbeddings] = None,
+        embedding_store: Optional[EmbeddingStore] = None,
+        retrieval_manager: Optional[Any] = None,
     ):
         self.search_service = search_service
         self.retrieval_service = retrieval_service
         self.ranking_model = ranking_model
-        self.two_tower = two_tower
-        self.lightgcn = lightgcn
+        self.embedding_store = embedding_store
+        # prefer a retrieval_manager when provided (new abstraction)
+        self.retrieval_manager = retrieval_manager
         self.tracks = self._load_tracks()
         self.track_map = self.tracks.set_index('track_id')
-        self.user_embedding_dim = self.two_tower.user_embeddings.shape[1] if self.two_tower is not None else (
-            self.lightgcn.user_embeddings.shape[1] if self.lightgcn is not None else 0
-        )
+        # try to infer user embedding dim from store
+        user_mat = self.embedding_store.get_user_matrix() if self.embedding_store else None
+        self.user_embedding_dim = user_mat.shape[1] if user_mat is not None else 0
         self.popular_tracks = self._build_popular_tracks()
 
     def _load_tracks(self) -> pd.DataFrame:
@@ -52,18 +52,15 @@ class RecommendationService:
         return ordered['track_id'].astype(str).tolist()
 
     def _get_embeddings(self, user_id: Optional[str]) -> np.ndarray:
-        if user_id and self.two_tower and self.two_tower.has_user(user_id):
-            emb = self.two_tower.get_user_embedding(user_id)
+        if user_id and self.embedding_store:
+            emb = self.embedding_store.get_user_embedding(user_id)
             if emb is not None:
                 return emb
-        if user_id and self.lightgcn and self.lightgcn.has_user(user_id):
-            emb = self.lightgcn.get_user_embedding(user_id)
-            if emb is not None:
-                return emb
-        if self.two_tower is not None:
-            return np.mean(self.two_tower.user_embeddings, axis=0)
-        if self.lightgcn is not None:
-            return np.mean(self.lightgcn.user_embeddings, axis=0)
+        # global mean fallback
+        if self.embedding_store:
+            user_mat = self.embedding_store.get_user_matrix()
+            if user_mat is not None:
+                return np.mean(user_mat, axis=0)
         return np.zeros((Config.EMBEDDING_DIMENSION,), dtype=np.float32)
 
     def _score_candidates(
@@ -80,10 +77,8 @@ class RecommendationService:
                 continue
             row = self.track_map.loc[track_id]
             item_embedding = None
-            if self.two_tower is not None:
-                item_embedding = self.two_tower.get_item_embedding(track_id)
-            if item_embedding is None and self.lightgcn is not None:
-                item_embedding = self.lightgcn.get_item_embedding(track_id)
+            if self.embedding_store:
+                item_embedding = self.embedding_store.get_item_embedding(track_id)
             if item_embedding is None:
                 item_embedding = np.zeros_like(user_embedding)
 
@@ -169,9 +164,15 @@ class RecommendationService:
         search_results = self.search_service.search(query, limit=Config.SEARCH_MAX_RESULTS) if query else {'corrected_query': '', 'results': []}
         candidate_ids: List[str] = []
         if user_id:
-            candidate_ids.extend(self.retrieval_service.retrieve_by_user(user_id, limit=Config.RETRIEVAL_CANDIDATE_LIMIT))
+            if self.retrieval_manager is not None:
+                candidate_ids.extend(self.retrieval_manager.retrieve_by_user(user_id, limit=Config.RETRIEVAL_CANDIDATE_LIMIT))
+            else:
+                candidate_ids.extend(self.retrieval_service.retrieve_by_user(user_id, limit=Config.RETRIEVAL_CANDIDATE_LIMIT))
         if query:
-            candidate_ids.extend(self.retrieval_service.retrieve_by_search(search_results['results'], limit=Config.RETRIEVAL_CANDIDATE_LIMIT))
+            if self.retrieval_manager is not None:
+                candidate_ids.extend(self.retrieval_manager.retrieve_by_search(search_results['results'], limit=Config.RETRIEVAL_CANDIDATE_LIMIT))
+            else:
+                candidate_ids.extend(self.retrieval_service.retrieve_by_search(search_results['results'], limit=Config.RETRIEVAL_CANDIDATE_LIMIT))
         if not candidate_ids:
             candidate_ids = self.popular_tracks[: Config.RETRIEVAL_CANDIDATE_LIMIT]
 

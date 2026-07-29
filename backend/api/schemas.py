@@ -41,3 +41,5 @@ class HealthResponse(BaseModel):
     search_ready: bool
     retrieval_ready: bool
     ranking_ready: bool
+    retrieval_status: Optional[dict] = None
+    embedding_info: Optional[dict] = None
