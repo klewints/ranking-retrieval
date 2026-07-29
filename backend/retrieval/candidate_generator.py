@@ -4,11 +4,11 @@ import ast
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+import numpy as np
 
 from backend.config import Config
 from backend.retrieval.faiss_index import FaissIndex
-from backend.retrieval.lightgcn import LightGCNEmbeddings
-from backend.retrieval.two_tower import TwoTowerEmbeddings
+from backend.retrieval.embedding_store import EmbeddingStore
 
 
 class CandidateGenerator:
@@ -24,13 +24,11 @@ class DefaultCandidateGenerator(CandidateGenerator):
         self,
         tracks: pd.DataFrame,
         faiss_index: FaissIndex,
-        two_tower: Optional[TwoTowerEmbeddings] = None,
-        lightgcn: Optional[LightGCNEmbeddings] = None,
+        embedding_store: Optional[EmbeddingStore] = None,
     ):
         self.tracks = tracks
         self.faiss_index = faiss_index
-        self.two_tower = two_tower
-        self.lightgcn = lightgcn
+        self.embedding_store = embedding_store
         self.popular_track_ids = self._build_popular_tracks()
 
     def _build_popular_tracks(self) -> List[str]:
@@ -77,7 +75,7 @@ class DefaultCandidateGenerator(CandidateGenerator):
 
         return matched['track_id'].astype(str).tolist()
 
-    def _query_faiss_by_embeddings(self, embeddings: List[Optional[List[float]]], limit: int) -> List[str]:
+    def _query_faiss_by_embeddings(self, embeddings: List[Optional[np.ndarray]], limit: int) -> List[str]:
         candidate_ids = []
         if not self.faiss_index.is_loaded():
             return candidate_ids
@@ -94,11 +92,14 @@ class DefaultCandidateGenerator(CandidateGenerator):
     def retrieve_by_user(self, user_id: str, limit: int = 20) -> List[str]:
         candidates: List[str] = []
 
-        if self.two_tower and self.two_tower.has_user(user_id):
-            embedding = self.two_tower.get_user_embedding(user_id)
-            candidates = self._query_faiss_by_embeddings([embedding], limit)
-        elif self.lightgcn and self.lightgcn.has_user(user_id):
-            embedding = self.lightgcn.get_user_embedding(user_id)
+        embedding = None
+        if self.embedding_store:
+            try:
+                embedding = self.embedding_store.get_user_embedding(user_id)
+            except Exception:
+                embedding = None
+
+        if embedding is not None:
             candidates = self._query_faiss_by_embeddings([embedding], limit)
 
         if not candidates:
@@ -128,14 +129,11 @@ class DefaultCandidateGenerator(CandidateGenerator):
             for track_id in candidate_ids[:5]:
                 try:
                     int(track_id)
-                    pass
                 except ValueError:
                     continue
                 item_embedding = None
-                if self.two_tower:
-                    item_embedding = self.two_tower.get_item_embedding(track_id)
-                if item_embedding is None and self.lightgcn:
-                    item_embedding = self.lightgcn.get_item_embedding(track_id)
+                if self.embedding_store:
+                    item_embedding = self.embedding_store.get_item_embedding(track_id)
                 embeddings.append(item_embedding)
             candidate_ids.extend(self._query_faiss_by_embeddings(embeddings, limit))
 

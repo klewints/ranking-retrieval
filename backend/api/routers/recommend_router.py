@@ -47,9 +47,32 @@ def similar(
 
 @router.get('/health', response_model=HealthResponse)
 def health(service: RecommendationService = Depends(get_recommendation_service)):
+    retrieval_ready = service.retrieval_service.is_ready()
+    # prefer retrieval_manager status when available
+    retrieval_status = None
+    embedding_info = None
+    try:
+        if getattr(service, 'retrieval_manager', None) is not None:
+            retrieval_status = service.retrieval_manager.get_status()
+        else:
+            # provide minimal diagnostics
+            retrieval_status = {
+                'faiss': service.retrieval_service.faiss_index.get_index_info() if hasattr(service.retrieval_service.faiss_index, 'get_index_info') else {'loaded': False},
+                'candidate_generator_initialized': getattr(service.retrieval_service, 'candidate_generator', None) is not None,
+            }
+    except Exception:
+        retrieval_status = {'faiss': {'loaded': False}}
+
+    try:
+        embedding_info = service.embedding_store.get_model_info() if getattr(service, 'embedding_store', None) is not None else {}
+    except Exception:
+        embedding_info = {}
+
     return {
         'status': 'ok',
         'search_ready': getattr(service.search_service, 'engine', None) is not None,
-        'retrieval_ready': service.retrieval_service.is_ready(),
+        'retrieval_ready': retrieval_ready,
         'ranking_ready': service.ranking_model is not None,
+        'retrieval_status': retrieval_status,
+        'embedding_info': embedding_info,
     }

@@ -5,11 +5,11 @@ from backend.retrieval.retrieval_service import RetrievalService
 from backend.config import Config
 
 
-def test_faiss_index_load_raises_file_not_found():
+def test_faiss_index_load_non_fatal():
     index = FaissIndex(index_path=Config.FAISS_INDEX_PATH)
-
-    with pytest.raises((FileNotFoundError, RuntimeError)):
-        index.load()
+    # load should not raise even if files are missing; instead index.is_loaded() should be False
+    index.load()
+    assert not index.is_loaded()
 
 
 def test_retrieval_service_reports_unavailable():
