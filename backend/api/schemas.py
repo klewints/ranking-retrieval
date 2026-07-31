@@ -13,6 +13,17 @@ class SearchResponse(BaseModel):
     results: List[SearchResult] = Field(default_factory=list)
 
 
+class CatalogSearchResult(BaseModel):
+    id: str = Field(..., json_schema_extra={"example": "track-blank-space"})
+    title: str = Field(..., json_schema_extra={"example": "Blank Space"})
+    score: float = Field(..., ge=0.0, le=100.0)
+
+
+class CatalogSearchResponse(BaseModel):
+    corrected_query: str = Field(..., json_schema_extra={"example": "Taylor Swift"})
+    results: List[CatalogSearchResult] = Field(default_factory=list)
+
+
 class RecommendationItem(BaseModel):
     track_id: str = Field(..., json_schema_extra={"example": "123"})
     track: str = Field(..., json_schema_extra={"example": "Blank Space"})
