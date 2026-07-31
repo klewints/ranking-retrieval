@@ -167,6 +167,8 @@ Repository structure
 - scripts/: convenience scripts to process data, train models and build FAISS index.
 
 - tests/: pytest-based unit tests covering search, preprocessing, retrieval scaffolding and config assertions.
+- <img width="1556" height="972" alt="image" src="https://github.com/user-attachments/assets/69752e32-cb65-4d28-9ad0-d7dd46b0ee02" />
+
 
 ## How to Run Locally
 
