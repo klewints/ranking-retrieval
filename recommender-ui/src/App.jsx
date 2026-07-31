@@ -7,6 +7,8 @@ function App() {
   const [error, setError] = useState("");
   const [isSearching, setIsSearching] = useState(false);
 
+  const visibleResults = results.slice(0, 20);
+
   async function search() {
     if (!query.trim()) return;
 
@@ -65,18 +67,26 @@ function App() {
 
           <div className="results-panel">
             {results.length > 0 ? (
-              <div className="results-grid">
-                {results.map((item, index) => (
-                  <article className="card" key={`${item.id || item.title}-${index}`}>
-                    <div className="card-topline">
-                      <span className="card-pill">Match</span>
-                      <span className="score-badge">{item.score.toFixed(2)}</span>
-                    </div>
-                    <h3>{item.title}</h3>
-                    <p>Recommended for your current search.</p>
-                  </article>
-                ))}
-              </div>
+              <>
+                <div className="results-header">
+                  <p>Showing top 20 recommendations</p>
+                </div>
+                <div className="results-grid">
+                  {visibleResults.map((item, index) => (
+                    <article className="card" key={`${item.id || item.title}-${index}`}>
+                      <div className="card-topline">
+                        <span className="play-button" aria-label="Play" />
+                        <span className="score-badge">{Number(item.score ?? 0).toFixed(2)}</span>
+                      </div>
+                      <h3>{item.title}</h3>
+                      <p className="card-meta">Artist • Track • Mood</p>
+                      <div className="card-footer">
+                        <span>Recommended for you</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="empty-state">
                 <p>Start with a query to reveal refined recommendations.</p>

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from backend.api.routers import search_router
 from backend.services.search_service import SearchService
 
 
@@ -105,3 +106,26 @@ def test_search_includes_genres(tmp_path: Path):
         item["category"] == "genre" and item["name"].lower() == "pop"
         for item in results["results"]
     )
+
+
+def test_search_route_returns_up_to_20_results(monkeypatch):
+    class FakeSearchService:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def search(self, query, limit):
+            return {
+                "corrected_query": query,
+                "results": [
+                    {"name": f"Result {index}", "category": "track", "score": 90.0}
+                    for index in range(25)
+                ],
+            }
+
+    monkeypatch.setattr(search_router, "SearchService", FakeSearchService)
+
+    response = search_router.search("test")
+
+    assert len(response["results"]) == 20
+    assert response["results"][0]["title"] == "Result 0"
+    assert response["results"][-1]["title"] == "Result 19"

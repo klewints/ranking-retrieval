@@ -26,7 +26,7 @@ def search(q: str = Query(..., min_length=1, description="Search query")):
 
     try:
         search_service = SearchService()
-        search_response = search_service.search(query, limit=10)
+        search_response = search_service.search(query, limit=20)
     except Exception:
         return {
             "corrected_query": query,
@@ -36,5 +36,5 @@ def search(q: str = Query(..., min_length=1, description="Search query")):
     raw_results = search_response.get("results", [])
     return {
         "corrected_query": search_response.get("corrected_query", query),
-        "results": [_to_card(item, index) for index, item in enumerate(raw_results[:10])],
+        "results": [_to_card(item, index) for index, item in enumerate(raw_results[:20])],
     }
