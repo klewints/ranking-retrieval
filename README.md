@@ -168,6 +168,88 @@ Repository structure
 
 - tests/: pytest-based unit tests covering search, preprocessing, retrieval scaffolding and config assertions.
 
+## How to Run Locally
+
+Follow these steps in order to run the project locally.
+
+### 1. Clone the repository
+
+```bash
+git clone <repository-url>
+cd ranking-retrieval
+```
+
+### 2. Backend setup
+
+Navigate to the backend project directory and create a Python virtual environment.
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+```
+
+On Windows PowerShell, use:
+
+```powershell
+cd backend
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Install the Python dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Run the existing preprocessing scripts to build the processed datasets used by the search backend:
+
+```bash
+python scripts/process_data.py
+```
+
+If your environment uses a different repository structure, adjust the path to the preprocessing script accordingly.
+
+Start the backend API server:
+
+```bash
+uvicorn backend.api.main:app --reload --port 8000
+```
+
+The API should then be available at:
+
+- http://localhost:8000/docs
+- http://localhost:8000/search?q=your-query
+
+### 3. Frontend setup
+
+Open a new terminal, navigate to the React frontend directory, and install the frontend dependencies:
+
+```bash
+cd recommender-ui
+npm install
+```
+
+Start the React development server:
+
+```bash
+npm run dev
+```
+
+The frontend should be available at:
+
+- http://localhost:5173
+
+### 4. Expected order of operations
+
+1. Preprocess the data first so the cleaned datasets exist.
+2. Start the backend API server.
+3. Start the frontend development server.
+4. Open the app in your browser at http://localhost:5173.
+
+This order ensures that the frontend can query the backend correctly and that the search service has the processed dataset available.
+
 Data pipeline
 
 Datasets
