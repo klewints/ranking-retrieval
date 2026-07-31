@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 
 import numpy as np
 
@@ -25,28 +25,49 @@ class FaissIndex:
         self.index_path = Path(index_path)
         self.track_ids_path = Path(track_ids_path)
         self.index = None
-        self.track_ids: list[str] = []
+        self.track_ids: List[str] = []
 
     def load(self) -> None:
+        """Attempt to load FAISS index and track id mapping.
+
+        Loading is non-fatal: missing faiss library or missing files will result in a logged warning and a disabled index.
+        """
         if faiss is None:
-            raise RuntimeError(
-                "FAISS library is not installed. Install faiss to use retrieval index loading."
-            )
+            logger.warning("FAISS library not installed; FAISS features will be disabled.")
+            self.index = None
+            self.track_ids = []
+            return
 
         if not self.index_path.exists():
-            raise FileNotFoundError(
-                f"FAISS index file does not exist at {self.index_path}"
-            )
+            logger.warning("FAISS index file does not exist at %s", self.index_path)
+            self.index = None
+            self.track_ids = []
+            return
+
         if not self.track_ids_path.exists():
-            raise FileNotFoundError(
-                f"FAISS track ID mapping does not exist at {self.track_ids_path}"
-            )
+            logger.warning("FAISS track ID mapping does not exist at %s", self.track_ids_path)
+            self.index = None
+            self.track_ids = []
+            return
 
-        logger.info("Loading FAISS index from %s", self.index_path)
-        self.index = faiss.read_index(str(self.index_path))
-        self.track_ids = self._load_track_ids()
+        try:
+            logger.info("Loading FAISS index from %s", self.index_path)
+            self.index = faiss.read_index(str(self.index_path))
+            self.track_ids = self._load_track_ids()
+            # basic validation
+            if self.index is not None:
+                dim = getattr(self.index, 'd', None)
+                ntotal = getattr(self.index, 'ntotal', None)
+                if ntotal is not None and self.track_ids and ntotal != len(self.track_ids):
+                    logger.warning(
+                        "FAISS index ntotal (%s) does not match track_ids length (%s)", ntotal, len(self.track_ids)
+                    )
+        except Exception as exc:
+            logger.exception("Failed to load FAISS index: %s", exc)
+            self.index = None
+            self.track_ids = []
 
-    def _load_track_ids(self) -> list[str]:
+    def _load_track_ids(self) -> List[str]:
         import pickle
 
         with open(self.track_ids_path, 'rb') as handle:
@@ -54,6 +75,22 @@ class FaissIndex:
 
     def is_loaded(self) -> bool:
         return self.index is not None and bool(self.track_ids)
+
+    def get_index_info(self) -> Dict[str, Any]:
+        if not self.index:
+            return {"loaded": False, "path": str(self.index_path)}
+        return {
+            "loaded": True,
+            "path": str(self.index_path),
+            "dim": getattr(self.index, 'd', None),
+            "ntotal": getattr(self.index, 'ntotal', None),
+        }
+
+    def reload(self) -> None:
+        self.load()
+
+    def rebuild(self) -> None:
+        raise NotImplementedError("FAISS rebuild is handled by offline scripts; call scripts/build_faiss.py to recreate indexes.")
 
     def get_track_ids(self, indices: List[int]) -> List[str]:
         return [self.track_ids[i] for i in indices if 0 <= i < len(self.track_ids)]
